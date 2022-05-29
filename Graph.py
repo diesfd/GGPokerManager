@@ -119,5 +119,5 @@ if __name__ == '__main__':
     win_with_showdown = [0.0]
     win_without_showdown = [0.0]
     total = [0.0]
-    analyze_hands('/Users/zhangyunxuan/myshit/扑克/handData/', win_with_showdown, win_without_showdown, total)
+    analyze_hands('#dir', win_with_showdown, win_without_showdown, total)
     draw_graph(win_with_showdown, win_without_showdown, total)
