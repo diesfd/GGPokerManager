@@ -9,6 +9,8 @@ def extend_list(nums):
 
 def str_to_float(s):
     if len(s[0]) == 0:
+        if len(s[1]) == 0:
+            return 0
         return float(s[1])
     else:
         offset = len(s[1])
@@ -48,16 +50,20 @@ def find_raise(hand):
 
 
 def find_pot(hand):
-    pot = re.findall('Total pot \$(\d*)\.?(\d+|\d+) \| Rake', hand)
+    pot = re.findall(r'Total pot \$(\d*)\.?(\d+|\d+) \| Rake', hand)
     return str_to_float(pot[0])
 
+
+def find_rake(hand):
+    rake = re.findall(r'\| Rake \$(\d*)\.?(\d+|\d+) \|', hand)
+    return str_to_float(rake[0])
 
 def find_uncalled_bet(hand):
     uncalled_bet = re.findall('Uncalled bet \(\$(\d*)\.?(\d+|\d+)\) returned to Hero', hand)
     return str_to_float(uncalled_bet[0])
 
 
-def analyze_hands(base_dir, win_with_showdown, win_without_showdown, total):
+def analyze_hands(base_dir, win_with_showdown, win_without_showdown, total, total_after_rake):
     dir_list = os.listdir(base_dir)
     dir_list.sort()
     for folder_name in dir_list:
@@ -77,6 +83,8 @@ def analyze_hands(base_dir, win_with_showdown, win_without_showdown, total):
                 extend_list(win_with_showdown)
                 extend_list(win_without_showdown)
                 extend_list(total)
+                extend_list(total_after_rake)
+                cur = len(total) - 1
 
                 win = re.search('Hero', hand.split('SHOWDOWN ***')[1].split('*** SUMMARY ***')[0]) is not None
                 showdown = re.search('Hero \(?[a-z]* ?[a-z]*\)? ?showed \[',
@@ -88,29 +96,33 @@ def analyze_hands(base_dir, win_with_showdown, win_without_showdown, total):
                 casualty += find_call(hand)
                 casualty += find_raise(hand)
 
-                total[len(total) - 1] -= casualty
+                total[cur] -= casualty
+                total_after_rake[cur] -= casualty
                 if showdown:
-                    win_with_showdown[len(win_with_showdown) - 1] -= casualty
+                    win_with_showdown[cur] -= casualty
                 else:
-                    win_without_showdown[len(win_without_showdown) - 1] -= casualty
+                    win_without_showdown[cur] -= casualty
 
                 if win:
+                    rake = find_rake(hand)
                     pot = find_pot(hand)
                     if showdown:
-                        win_with_showdown[len(win_with_showdown) - 1] += pot
+                        win_with_showdown[cur] += pot
                     else:
                         pot += find_uncalled_bet(hand)
-                        win_without_showdown[len(win_without_showdown) - 1] += pot
-                    total[len(total) - 1] += pot
+                        win_without_showdown[cur] += pot
+                    total[cur] += pot
+                    total_after_rake[cur] += pot - rake
 
     return 0
 
 
-def draw_graph(win_with_showdown, win_without_showdown, total):
+def draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake):
     x = range(len(total))
     plt.plot(x, total, color='g', label='Net won')
     plt.plot(x, win_without_showdown, color='r', label='Won without showdown')
     plt.plot(x, win_with_showdown, color='b', label='Won with showdown')
+    plt.plot(x, total_after_rake, color='yellow', label='Net won (after rake)')
     plt.legend()
     plt.show()
 
@@ -119,5 +131,7 @@ if __name__ == '__main__':
     win_with_showdown = [0.0]
     win_without_showdown = [0.0]
     total = [0.0]
-    analyze_hands('#dir', win_with_showdown, win_without_showdown, total)
-    draw_graph(win_with_showdown, win_without_showdown, total)
+    total_after_rake = [0.0]
+    analyze_hands('#dir', win_with_showdown, win_without_showdown, total,
+                  total_after_rake)
+    draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake)
