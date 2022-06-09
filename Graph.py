@@ -49,8 +49,8 @@ def find_raise(hand):
     return result
 
 
-def find_pot(hand):
-    pot = re.findall(r'Total pot \$(\d*)\.?(\d+|\d+) \| Rake', hand)
+def find_profit(hand):
+    pot = re.findall(r'Hero collected \$(\d*)\.?(\d+|\d+) from pot', hand)
     return str_to_float(pot[0])
 
 
@@ -64,28 +64,70 @@ def find_uncalled_bet(hand):
     return str_to_float(uncalled_bet[0])
 
 
-def get_time(file_name):
+def get_date(file_name):
     return file_name[2:10]
+
+
+def get_time(hand):
+    time = re.findall('- \d+/\d+/\d+ ([0-9:]+)\nTable', hand)
+    return time
+
+
+def merge_hand_lists(list1, list2):
+    i = 0
+    j = 0
+    new_list = []
+    while i < len(list1) and j < len(list2):
+        time1 = get_time(list1[i])[0]
+        time2 = get_time(list2[j])[0]
+        if time1 < time2:
+            new_list.append(list1[i])
+            i += 1
+        else:
+            new_list.append(list2[j])
+            j += 1
+
+    if i < len(list1):
+        new_list += list1[i:]
+    else:
+        new_list += list2[j:]
+    return new_list
 
 
 def analyze_hands(base_dir, start_time, end_time, win_with_showdown, win_without_showdown, total, total_after_rake):
     session_list = os.listdir(base_dir)
     session_list.sort()
-    for file_name in session_list:
-        _, file_extension = os.path.splitext(base_dir + file_name)
-        if file_extension != '.txt':
-            continue
 
-        time = get_time(file_name)
-        if len(start_time) > 0 and time < start_time:
+    i = 0
+    while i < len(session_list):
+        _, file_extension = os.path.splitext(base_dir + session_list[i])
+        if file_extension != '.txt':
+            del session_list[i]
+        else:
+            i += 1
+
+    slow = 0
+    fast = 0
+    while slow < len(session_list):
+        file_name = session_list[slow]
+
+        date = get_date(file_name)
+        if len(start_time) > 0 and date < start_time:
+            slow += 1
             continue
-        if len(end_time) > 0 and time > end_time:
+        if len(end_time) > 0 and date > end_time:
             return
 
         f = open(base_dir + file_name, "r")
-        content = f.read().split('Poker Hand #')
+        hand_list = list(reversed(f.read().split('Poker Hand #')[1:]))
+        fast = slow + 1
+        while fast < len(session_list) and get_date(session_list[fast]) == date:
+            new_hand_list = list(reversed(open(base_dir + session_list[fast], "r").read().split('Poker Hand #')[1:]))
+            hand_list = merge_hand_lists(hand_list, new_hand_list)
+            fast += 1
+        slow = fast
 
-        for hand in content:
+        for hand in hand_list:
             if len(hand) == 0:
                 continue
 
@@ -114,22 +156,25 @@ def analyze_hands(base_dir, start_time, end_time, win_with_showdown, win_without
 
             if win:
                 rake = find_rake(hand)
-                pot = find_pot(hand)
+                showdown_result = hand.split('*** SHOWDOWN ***')[1].split('*** SUMMARY ***')[0]
+                profit = find_profit(showdown_result)
                 if showdown:
-                    win_with_showdown[cur] += pot
+                    win_with_showdown[cur] += profit
                 else:
-                    pot += find_uncalled_bet(hand)
-                    win_without_showdown[cur] += pot
-                total[cur] += pot
-                total_after_rake[cur] += pot - rake
+                    profit += find_uncalled_bet(hand)
+                    win_without_showdown[cur] += profit
+                total[cur] += profit
+                total_after_rake[cur] += profit - rake
 
 
 def draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake):
     x = range(len(total))
+    vert = [0] * len(total)
     plt.plot(x, total, color='g', label='Net won')
     plt.plot(x, total_after_rake, color='yellow', label='Net won (after rake)')
     plt.plot(x, win_with_showdown, color='b', label='Won with showdown')
     plt.plot(x, win_without_showdown, color='r', label='Won without showdown')
+    plt.plot(x, vert, color='black')
     plt.legend()
     plt.show()
 
@@ -139,7 +184,7 @@ if __name__ == '__main__':
     win_without_showdown = [0.0]
     total = [0.0]
     total_after_rake = [0.0]
-    analyze_hands('#dir', '20220511', '20220517', win_with_showdown,
+    analyze_hands('/Users/zhangyunxuan/myshit/扑克/handData/', '20220608', '', win_with_showdown,
                   win_without_showdown, total,
                   total_after_rake)
     draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake)
