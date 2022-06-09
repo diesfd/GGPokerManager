@@ -64,6 +64,11 @@ def find_uncalled_bet(hand):
     return str_to_float(uncalled_bet[0])
 
 
+def find_jackpot(hand):
+    rakeback = re.findall('\| Jackpot \$(\d*)\.?(\d+|\d+) \|', hand)
+    return str_to_float(rakeback[0])
+
+
 def get_date(file_name):
     return file_name[2:10]
 
@@ -107,7 +112,6 @@ def analyze_hands(base_dir, start_time, end_time, win_with_showdown, win_without
             i += 1
 
     slow = 0
-    fast = 0
     while slow < len(session_list):
         file_name = session_list[slow]
 
@@ -138,7 +142,7 @@ def analyze_hands(base_dir, start_time, end_time, win_with_showdown, win_without
             cur = len(total) - 1
 
             win = re.search('Hero', hand.split('SHOWDOWN ***')[1].split('*** SUMMARY ***')[0]) is not None
-            showdown = re.search('Hero \(?[a-z]* ?[a-z]*\)? ?showed \[',
+            is_showdown = re.search('Hero \(?[a-z]* ?[a-z]*\)? ?showed \[',
                                  hand.split('*** SUMMARY ***')[1]) is not None
 
             casualty = 0
@@ -149,22 +153,23 @@ def analyze_hands(base_dir, start_time, end_time, win_with_showdown, win_without
 
             total[cur] -= casualty
             total_after_rake[cur] -= casualty
-            if showdown:
+            if is_showdown:
                 win_with_showdown[cur] -= casualty
             else:
                 win_without_showdown[cur] -= casualty
 
             if win:
                 rake = find_rake(hand)
-                showdown_result = hand.split('*** SHOWDOWN ***')[1].split('*** SUMMARY ***')[0]
-                profit = find_profit(showdown_result)
-                if showdown:
+                showdown = hand.split('*** SHOWDOWN ***')[1].split('*** SUMMARY ***')[0]
+                jackPot = find_jackpot(hand)
+                profit = find_profit(showdown) + rake + jackPot
+                if is_showdown:
                     win_with_showdown[cur] += profit
                 else:
                     profit += find_uncalled_bet(hand)
                     win_without_showdown[cur] += profit
                 total[cur] += profit
-                total_after_rake[cur] += profit - rake
+                total_after_rake[cur] += profit - rake - jackPot
 
 
 def draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake):
@@ -184,7 +189,7 @@ if __name__ == '__main__':
     win_without_showdown = [0.0]
     total = [0.0]
     total_after_rake = [0.0]
-    analyze_hands('/Users/zhangyunxuan/myshit/扑克/handData/', '20220608', '', win_with_showdown,
+    analyze_hands('/Users/zhangyunxuan/myshit/扑克/handData/', '20220604', '', win_with_showdown,
                   win_without_showdown, total,
                   total_after_rake)
     draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake)
