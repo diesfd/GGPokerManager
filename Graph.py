@@ -189,7 +189,7 @@ if __name__ == '__main__':
     win_without_showdown = [0.0]
     total = [0.0]
     total_after_rake = [0.0]
-    analyze_hands('/Users/zhangyunxuan/myshit/扑克/handData/', '20220604', '', win_with_showdown,
+    analyze_hands('', '', win_with_showdown,
                   win_without_showdown, total,
                   total_after_rake)
     draw_graph(win_with_showdown, win_without_showdown, total, total_after_rake)
